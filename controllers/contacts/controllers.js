@@ -1,17 +1,32 @@
-const { Contact, addScheme, updateFavScheme } = require("../models/contact");
-const { ctrlWrapper, HttpError } = require("../helpers");
+const { Contact, addScheme, updateFavScheme } = require("../../models/contact");
+const { ctrlWrapper, HttpError } = require("../../helpers");
 
 async function getListController(req, res) {
-  const result = await Contact.find();
+  const { _id: owner } = req.user;
+  const { page = 1, limit = 10, favorite } = req.query;
+  const findParams = favorite ? { owner, favorite } : { owner };
+  const skip = (page - 1) * limit;
+
+  const result = await Contact.find(findParams, "-createAt -updateAt", {
+    skip,
+    limit,
+  }).populate("owner", "email subscription");
+
+  if (result.length === 0) {
+    return res.status(204).json({ message: "No Content" });
+  }
   res.json(result);
 }
 
 async function getContactController(req, res, next) {
   const { contactId } = req.params;
-  const result = await Contact.findById(contactId);
+  const { _id: owner } = req.user;
+
+  const result = await Contact.findOne({ _id: contactId, owner });
   if (!result) {
     throw HttpError(404, "Not Found");
   }
+
   res.json(result);
 }
 
@@ -20,7 +35,9 @@ async function postContactController(req, res, next) {
   if (error) {
     throw HttpError(400, error.message);
   }
-  const result = await Contact.create(req.body);
+  const { _id: owner } = req.user;
+
+  const result = await Contact.create({ ...req.body, owner });
   res.status(201).json(result);
 }
 

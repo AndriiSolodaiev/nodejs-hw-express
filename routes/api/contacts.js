@@ -1,9 +1,11 @@
 const express = require("express");
 
 const router = express.Router();
-const controllers = require("../../controllers");
+const controllers = require("../../controllers/contacts");
 const { isValidId } = require("../../helpers");
+const { authenticate } = require("../../midleware");
 
+router.use(authenticate);
 router.get("/", controllers.getListController);
 
 router.get("/:contactId", isValidId, controllers.getContactController);
