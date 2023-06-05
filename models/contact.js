@@ -1,7 +1,6 @@
 const { Schema, model } = require("mongoose");
 const Joi = require("joi");
 const { handleMongooseError } = require("../helpers");
-// const { User } = require("./user")
 
 const contactSchema = new Schema(
   {
@@ -20,6 +19,7 @@ const contactSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    avatarURL: { type: String, required: [true, "Set avatar for contact"] },
     owner: {
       type: Schema.Types.ObjectId,
       ref: "user",
@@ -35,6 +35,7 @@ const addScheme = Joi.object({
   email: Joi.string(),
   phone: Joi.string().required(),
   favorite: Joi.boolean(),
+  avatarURL: Joi.string(),
 });
 
 const updateFavScheme = Joi.object({

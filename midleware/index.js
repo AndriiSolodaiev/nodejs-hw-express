@@ -1,3 +1,3 @@
 const authenticate = require("./authenticate");
-
-module.exports = { authenticate };
+const upload = require("./multer");
+module.exports = { authenticate, upload };

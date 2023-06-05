@@ -1,6 +1,7 @@
 const { Contact, addScheme, updateFavScheme } = require("../../models/contact");
 const { ctrlWrapper, HttpError } = require("../../helpers");
-
+const fs = require("fs").promises;
+const path = require("path");
 async function getListController(req, res) {
   const { _id: owner } = req.user;
   const { page = 1, limit = 10, favorite } = req.query;
@@ -37,7 +38,16 @@ async function postContactController(req, res, next) {
   }
   const { _id: owner } = req.user;
 
-  const result = await Contact.create({ ...req.body, owner });
+  const contactsDir = path.join(__dirname, "..", "..", "public", "avatars");
+  const { path: tempUpload, originalname } = req.file;
+  const resultUpload = path.join(contactsDir, originalname);
+  await fs.rename(tempUpload, resultUpload);
+
+  const result = await Contact.create({
+    ...req.body,
+    owner,
+    avatarURL: resultUpload,
+  });
   res.status(201).json(result);
 }
 
