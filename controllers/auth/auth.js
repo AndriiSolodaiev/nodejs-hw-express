@@ -1,16 +1,18 @@
 const bcrypt = require("bcrypt");
-const { HttpError, ctrlWrapper } = require("../../helpers");
+const { HttpError, ctrlWrapper, sendEmail } = require("../../helpers");
 const {
   User,
   userRegisterSchema,
   userLoginSchema,
   userUpdateSubscrSchema,
+  userVarifySchema,
 } = require("../../models/user");
 const jwt = require("jsonwebtoken");
 require("dotenv");
-const { SEKRET_KEY } = process.env;
+const { SEKRET_KEY, PROJECT_URL } = process.env;
 const gravatar = require("gravatar");
 const path = require("path");
+const { nanoid } = require("nanoid");
 
 const fs = require("fs/promises");
 const Jimp = require("jimp");
@@ -34,7 +36,18 @@ const register = async (req, res, next) => {
     const avatarURL = gravatar.url(newUser.email, { s: "250" });
 
     newUser.avatarURL = avatarURL;
+
+    const verificationCode = nanoid();
+    newUser.verificationCode = verificationCode;
+
     await User.create(newUser);
+    const verifyEmail = {
+      to: newUser.email,
+      subject: "Verify email",
+      html: `<a target="_blank" href="${PROJECT_URL}/api/users/verify/${verificationCode}">Click to verify your email</a>`,
+    };
+
+    await sendEmail(verifyEmail);
     return res.status(201).end();
   } catch (error) {
     return next(error);
@@ -50,10 +63,9 @@ const login = async (req, res, next) => {
   try {
     const user = await User.findOne({ email });
 
-    if (!user) {
+    if (!user || !user.verify) {
       return res.status(401).json({ error: "Email or password is incorrect." });
     }
-
     const isMAtch = await bcrypt.compare(password, user.password);
 
     if (!isMAtch) {
@@ -69,6 +81,45 @@ const login = async (req, res, next) => {
   } catch (error) {
     return next(error);
   }
+};
+const verify = async (req, res) => {
+  const { verificationCode } = req.params;
+  const user = await User.findOne({ verificationCode });
+  if (!user) {
+    throw HttpError(404, "User is not verified");
+  }
+
+  await User.findByIdAndUpdate(user._id, {
+    verify: true,
+    verificationCode: "",
+  });
+  res.json({ message: "Verification is successful" });
+};
+
+const resendVerifyEmail = async (req, res) => {
+  const { error } = userVarifySchema.validate(req.body);
+  if (error) {
+    throw HttpError(401, error.message);
+  }
+
+  const { email } = req.body;
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    throw HttpError(404, "Not found");
+  }
+  if (user.verify) {
+    throw HttpError(400, "Email has already been verified");
+  }
+  const verifyEmail = {
+    to: email,
+    subject: "Verify email",
+    html: `<a target="_blank" href="${PROJECT_URL}/api/users/verify/${user.verificationCode}">Click to verify your email</a>`,
+  };
+
+  await sendEmail(verifyEmail);
+
+  res.json({ message: "Verify email send" });
 };
 
 const getCurrent = async (req, res) => {
@@ -120,4 +171,6 @@ module.exports = {
   logout: ctrlWrapper(logout),
   patchSubscr: ctrlWrapper(patchSubscr),
   patchAvatar: ctrlWrapper(patchAvatar),
+  verify: ctrlWrapper(verify),
+  resendVerifyEmail: ctrlWrapper(resendVerifyEmail),
 };
