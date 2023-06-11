@@ -9,6 +9,11 @@ const {
 const jwt = require("jsonwebtoken");
 require("dotenv");
 const { SEKRET_KEY } = process.env;
+const gravatar = require("gravatar");
+const path = require("path");
+
+const fs = require("fs/promises");
+const Jimp = require("jimp");
 
 const register = async (req, res, next) => {
   const { error } = userRegisterSchema.validate(req.body);
@@ -26,6 +31,9 @@ const register = async (req, res, next) => {
       return res.status(409).json({ message: "User already exists." });
     }
     newUser.password = await bcrypt.hash(newUser.password, 10);
+    const avatarURL = gravatar.url(newUser.email, { s: "250" });
+
+    newUser.avatarURL = avatarURL;
     await User.create(newUser);
     return res.status(201).end();
   } catch (error) {
@@ -87,10 +95,29 @@ const patchSubscr = async (req, res, next) => {
   }
   res.json(result);
 };
+
+const patchAvatar = async (req, res, next) => {
+  const { _id } = req.user;
+  const avatarDir = path.join(__dirname, "..", "..", "public", "avatars");
+  const { path: tempUpload, originalname } = req.file;
+
+  const imageDir = path.join(__dirname, "..", "..", "temp", originalname);
+  const image = await Jimp.read(imageDir);
+  image.resize(250, 250);
+  image.write(imageDir);
+
+  const fileName = `${_id}_${originalname}`;
+  const resultUplaod = path.join(avatarDir, fileName);
+  await fs.rename(tempUpload, resultUplaod);
+  const avatarURL = path.join("avatars", originalname);
+  await User.findByIdAndUpdate(_id, { avatarURL });
+  res.json({ avatarURL });
+};
 module.exports = {
   register: ctrlWrapper(register),
   login: ctrlWrapper(login),
   getCurrent,
   logout: ctrlWrapper(logout),
   patchSubscr: ctrlWrapper(patchSubscr),
+  patchAvatar: ctrlWrapper(patchAvatar),
 };

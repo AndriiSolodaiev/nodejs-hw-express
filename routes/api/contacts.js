@@ -3,14 +3,14 @@ const express = require("express");
 const router = express.Router();
 const controllers = require("../../controllers/contacts");
 const { isValidId } = require("../../helpers");
-const { authenticate } = require("../../midleware");
+const { authenticate, upload } = require("../../midleware");
 
 router.use(authenticate);
 router.get("/", controllers.getListController);
 
 router.get("/:contactId", isValidId, controllers.getContactController);
 
-router.post("/", controllers.postContactController);
+router.post("/", upload.single("avatarURL"), controllers.postContactController);
 
 router.delete("/:contactId", isValidId, controllers.deleteContactController);
 
